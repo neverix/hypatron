@@ -84,6 +84,9 @@ def root(prompt: str = "photo of a dog running on grassland, masterpiece, best q
     print("Generated images:")
     # for each PIL.Image.Image inside images, convert to base 64 and return
     images = [pil_image_to_base64(image) for image in images]
+
+
+
     return {"images": images}
 
 
@@ -91,9 +94,9 @@ def root(prompt: str = "photo of a dog running on grassland, masterpiece, best q
 
 @stub.function()
 @modal.web_endpoint(method="POST")
-def audio_webhook(receieved_output: dict):
-    print(receieved_output)
-    return receieved_output
+def audio_webhook(description_obj: dict):
+    print(description_obj)
+    # convert description to audio
 
 
 # @markdown # Running FABRIC
