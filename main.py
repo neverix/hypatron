@@ -99,6 +99,7 @@ if __name__ == "__main__":
         # The following loop acquires data, computes band powers, and calculates neurofeedback metrics based on those band powers
         while True:
             if not imgs:
+                # roman your stuff goes here
                 requests.post("...", json=avgs)
                 avgs = []
                 imgs = requests.get("...")
