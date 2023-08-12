@@ -97,6 +97,7 @@ async def main():
     # avg_samples = 1000
     avg_samples = 80  # for some reason it's really slow, is this data legit?
     batch = 4
+    auds = []
 
     session = aiohttp.ClientSession()
     async def img(req):
@@ -140,8 +141,20 @@ async def main():
                     avgs = []
                 # imgs = json.loads(sock.recv())
                 postf = "" if image_index is None else f"&image_index={image_index}"
-                async with session.get("https://shreyj1729--eeg-art-root.modal.run/?prompt=cat&negative_prompt={postf}") as pics:
+                async with session.get(f"https://shreyj1729--eeg-art-root.modal.run/?prompt=cat&negative_prompt={postf}") as pics:
                     imgs = (await pics.json())["images"]
+                try:
+                    prompts = []
+                    for img in imgs:
+                        async with session.get(f"https://shreyj1729--eeg-art-image-to-text-dev.modal.run/?image_base64={img}") as texts:
+                            prompts.append(await texts.text())
+                    print(prompts)
+                    auds = []
+                    for prompt in prompts:
+                        async with session.get(f"https://shreyj1729--eeg-art-audio-webhook-dev.modal.run?prompt={prompt}") as aud:
+                            auds.append(aud.read())
+                except:
+                    pass
                 print("sent")
                 print("Received:", len(imgs), str(imgs)[:50])
                 # batch = len(imgs["images"])
@@ -208,6 +221,12 @@ async def main():
             metric = [alpha_metric, beta_metric, theta_metric]
             metrics.append(metric)
             if len(metrics) >= avg_samples:  # % avg_samples == avg_samples - 1:
+                try:
+                    from playsound import playsound
+                    open("out.wav", "wb").write(auds[len(avgs)])
+                    playsound("out.wav")
+                except:
+                    pass
                 avgs.append(list(np.mean(metrics, axis=0)))
                 metrics = []
             if len(avgs) == batch:
