@@ -1,11 +1,12 @@
 import modal
 
-
 image = (
     modal.Image.debian_slim()
-    .pip_install_from_requirements("requirements.txt")
-    .run_commands("git clone https://github.com/sd-fabric/fabric.git")
-)
+    .run_commands(
+        "apt update && apt install -y git portaudio19-dev",
+        "git clone https://github.com/sd-fabric/fabric.git")
+    ).pip_install_from_requirements("requirements.txt")
+    
 
 stub = modal.Stub("eeg-art", image=image)
 
@@ -38,7 +39,7 @@ if not modal.is_local():
 
 @stub.function(keep_warm=1, concurrency_limit=1, gpu=modal.gpu.A100(memory=20))
 @modal.web_endpoint(method="GET")
-def generate_image(prompt: str = "photo of a dog running on grassland, masterpiece, best quality, fine details", negative_prompt: str = "lowres, bad anatomy, bad hands, cropped, worst quality",
+def root(prompt: str = "photo of a dog running on grassland, masterpiece, best quality, fine details", negative_prompt: str = "lowres, bad anatomy, bad hands, cropped, worst quality",
                    denoising_steps = 20,
                    guidance_scale = 6.0,
                    feedback_start = 0.0,
