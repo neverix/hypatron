@@ -1,0 +1,11 @@
+Fabric
+matplotlib
+muselsl
+numpy
+Pillow
+Pillow
+pylsl
+Requests
+scikit_learn
+scipy
+torch
