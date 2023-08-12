@@ -14,7 +14,7 @@ image = (
 stub = modal.Stub("eeg-art", image=image)
 
 generator = None
-images = []
+images_data = []
 
 def pil_image_to_base64(img: Image.Image, format="PNG") -> str:
     """
@@ -68,7 +68,7 @@ def root(prompt: str = "photo of a dog running on grassland, masterpiece, best q
     
     if img_index is not None:
         generator.give_feedback(liked=images[img_index])
-        return images[img_index]
+        return images_data[img_index]
     
     images = generator.generate(
         prompt=prompt,
@@ -79,12 +79,21 @@ def root(prompt: str = "photo of a dog running on grassland, masterpiece, best q
         feedback_end=feedback_end,
     )
 
+    images_data = images
+
     print("Generated images:")
     # for each PIL.Image.Image inside images, convert to base 64 and return
     images = [pil_image_to_base64(image) for image in images]
     return {"images": images}
 
 
+
+
+@stub.function()
+@modal.web_endpoint(method="POST")
+def audio_webhook(receieved_output: dict):
+    print(receieved_output)
+    return receieved_output
 
 
 # @markdown # Running FABRIC
