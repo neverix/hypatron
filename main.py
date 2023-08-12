@@ -93,16 +93,20 @@ if __name__ == "__main__":
     avgs = []
     metrics = []
     imgs = []
-    avg_samples = 3000
+    avg_samples = 3
     batch = 4
     try:
         # The following loop acquires data, computes band powers, and calculates neurofeedback metrics based on those band powers
         while True:
             if not imgs:
                 # roman your stuff goes here
-                requests.post("...", json=avgs)
+                if avgs:
+                    print(avgs)
+                    pass
+                    # requests.post("...", json=avgs)
                 avgs = []
-                imgs = requests.get("...")
+                # imgs = requests.get("...")
+                imgs = [2]
             """ 3.1 ACQUIRE DATA """
             # Obtain EEG data from the LSL stream
             eeg_data, timestamp = inlet.pull_chunk(
@@ -112,7 +116,7 @@ if __name__ == "__main__":
             try:
                 ch_data = np.array(eeg_data)[:, INDEX_CHANNEL]
             except IndexError:
-                pass
+                continue
 
             # Update EEG buffer with the new data
             eeg_buffer, filter_state = utils.update_buffer(
@@ -142,33 +146,33 @@ if __name__ == "__main__":
             # Simple redout of alpha power, divided by delta waves in order to rule out noise
             alpha_metric = smooth_band_powers[Band.Alpha] / \
                 (smooth_band_powers[Band.Delta] + smooth_band_powers[Band.Alpha])
-            print('Alpha Relaxation: ', alpha_metric)
+            # print('Alpha Relaxation: ', alpha_metric)
 
             # Beta Protocol:
             # Beta waves have been used as a measure of mental activity and concentration
             # This beta over theta ratio is commonly used as neurofeedback for ADHD
             beta_metric = smooth_band_powers[Band.Beta] / \
                 smooth_band_powers[Band.Theta]
-            print('Beta Concentration: ', beta_metric)
+            # print('Beta Concentration: ', beta_metric)
 
             # Alpha/Theta Protocol:
             # This is another popular neurofeedback metric for stress reduction
             # Higher theta over alpha is supposedly associated with reduced anxiety
             theta_metric = smooth_band_powers[Band.Theta] / \
                 smooth_band_powers[Band.Alpha]
-            print('Theta Relaxation: ', theta_metric)
+            # print('Theta Relaxation: ', theta_metric)
 
             plt.clf()
             plt.plot(metrics)
             plt.pause(0.05)
 
-            metric = alpha_metric
+            metric = [alpha_metric, beta_metric, theta_metric]
             metrics.append(metric)
             if len(metrics) % avg_samples == avg_samples - 1:
-                avgs.append(np.mean(metrics))
+                avgs.append(list(np.mean(metrics, axis=0)))
                 metrics = []
             if len(avgs) == batch:
-                avgs = []
+                imgs = []
 
             counter += 1
 
