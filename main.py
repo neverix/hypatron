@@ -7,6 +7,9 @@ import subprocess
 from muselsl.cli import CLI
 
 import requests
+import websockets
+from websockets.sync.client import connect
+import json
 
 
 subprocess.Popen(["python3.11", "-m", "muselsl", "stream"])
@@ -45,6 +48,8 @@ SHIFT_LENGTH = EPOCH_LENGTH - OVERLAP_LENGTH
 INDEX_CHANNEL = [0]
 
 if __name__ == "__main__":
+    """ 0. CONNECT TO SERVER """
+    sock = connect("ws://localhost:8765")
 
     """ 1. CONNECT TO EEG STREAM """
 
@@ -83,30 +88,36 @@ if __name__ == "__main__":
     # bands will be ordered: [delta, theta, alpha, beta]
     band_buffer = np.zeros((n_win_test, 4))
 
-    """ 3. GET DATA """
-
-    # The try/except structure allows to quit the while loop by aborting the
-    # script with <Ctrl-C>
-    print('Press Ctrl-C in the console to break the while loop.')
-
     counter = 0
     avgs = []
     metrics = []
     imgs = []
     avg_samples = 3
     batch = 4
+
+    """ 3. GET DATA """
+
+    # The try/except structure allows to quit the while loop by aborting the
+    # script with <Ctrl-C>
+    print('Press Ctrl-C in the console to break the while loop.')
     try:
         # The following loop acquires data, computes band powers, and calculates neurofeedback metrics based on those band powers
         while True:
+            print("Images available", len(imgs), "Metrics available", len(metrics),
+                  "Avgs available", len(avgs))
             if not imgs:
                 # roman your stuff goes here
                 if avgs:
-                    print(avgs)
-                    pass
+                    # print(avgs)
+                    # pass
                     # requests.post("...", json=avgs)
-                avgs = []
+                    sock.send(json.dumps({"averages": avgs}))
+                    print("sent")
+                    avgs = []
+                imgs = json.loads(sock.recv())
+                print("Received:", str(imgs)[:50])
+                batch = len(imgs["images"])
                 # imgs = requests.get("...")
-                imgs = [2]
             """ 3.1 ACQUIRE DATA """
             # Obtain EEG data from the LSL stream
             eeg_data, timestamp = inlet.pull_chunk(
