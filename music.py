@@ -4,25 +4,25 @@ from audiocraft.models import MusicGen
 from audiocraft.data.audio import audio_write
 
 import itertools
-from gradio import networking
-import secrets
-from asyncio import Queue
+# from gradio import networking
+# import secrets
+# from asyncio import Queue
 
 import pyaudio
 import typing as tp
 import wave
 import torch
 
-from audiocraft.models.encodec import CompressionModel
-from audiocraft.models.lm import LMModel
-from audiocraft.models.builders import get_debug_compression_model, get_debug_lm_model
-from audiocraft.models.loaders import load_compression_model, load_lm_model
-from audiocraft.data.audio_utils import convert_audio
+# from audiocraft.models.encodec import CompressionModel
+# from audiocraft.models.lm import LMModel
+# from audiocraft.models.builders import get_debug_compression_model, get_debug_lm_model
+# from audiocraft.models.loaders import load_compression_model, load_lm_model
+# from audiocraft.data.audio_utils import convert_audio
 from audiocraft.modules.conditioners import ConditioningAttributes, WavCondition
-from audiocraft.utils.autocast import TorchAutocast
+# from audiocraft.utils.autocast import TorchAutocast
 import argparse
 
-import websockets
+# import websockets
 
 
 parser = argparse.ArgumentParser()
@@ -46,27 +46,33 @@ self = model
 # print(self.lm.state_dict().keys())
 if args.weights_path is not None:
     self.lm.load_state_dict(torch.load(args.weights_path))
+device = "mps"
+self.lm.to(device)
 
+# new_audios = Queue()
+# async def handler(websocket, path):
+#     print("connected", path)
+#     while True:
+#         data = await new_audios.get()
+#         await websocket.send(data)
+#         await websocket.receive()
+# host, port = "0.0.0.0", "8080"
+# start_server = websockets.serve(handler, host, port)
 
-new_audios = Queue()
-async def handler(websocket, path):
-    print("connected", path)
-    while True:
-        data = await new_audios.get()
-        await websocket.send(data)
-        await websocket.receive()
-host, port = "0.0.0.0", "8080"
-start_server = websockets.serve(handler, host, port)
-
-share_token = secrets.token_urlsafe(32)
-share_link = networking.setup_tunnel(host, port, share_token)
-print(f"Shared at {share_link}")
+# share_token = secrets.token_urlsafe(32)
+# share_link = networking.setup_tunnel(host, port, share_token)
+# print(f"Shared at {share_link}")
 
 prompt_tokens = None
 pya = pyaudio.PyAudio()
-stream = pya.open(format=pya.get_format_from_width(width=2), channels=1, rate=OUTPUT_SAMPLE_RATE, output=True)
+stream = pya.open(format=pya.get_format_from_width(width=2), channels=1, rate=self.sample_rate, output=True)
 for prompt in itertools.cycle(["electronic japanese noir jazz"]):
     attributes, _ = self._prepare_tokens_and_attributes([prompt], None)
+    wav = attributes[0].wav["self_wav"]
+    attributes[0].wav["self_wav"] = WavCondition(
+        wav=wav.wav.to(device),
+        length = wav.length.to(device)
+    )
     print("attributes:", attributes)
     print("prompt_tokens:", prompt_tokens)
 
@@ -85,21 +91,23 @@ for prompt in itertools.cycle(["electronic japanese noir jazz"]):
 
     # torchaudio.save(args.save_path, torch.zeros(2, dtype=torch.long), self.sample_rate)
     # new_audios.put(b"RIFF0000WAVEfmt\0")
-    with wave.Wave_write(args.save_path) as wv:
-        wv.setsampwidth(1)
-        wv.setnchannels(1)
-        wv.setframerate(self.sample_rate)
-    new_audios.put(open(args.save_path, "rb").read())
+    # with wave.Wave_write(args.save_path) as wv:
+    #     wv.setsampwidth(1)
+    #     wv.setnchannels(1)
+    #     wv.setframerate(self.sample_rate)
+    # new_audios.put(open(args.save_path, "rb").read())
 
     for _ in trange(args.sample_loops):
         with torch.no_grad(), self.autocast:
+
             gen_tokens = self.lm.generate(prompt_tokens, attributes, callback=None, **self.generation_params)
             new_tokens = gen_tokens[..., prompt_tokens.shape[-1] if prompt_tokens is not None else 0:]
 
             gen_audio = self.compression_model.decode(new_tokens, None)
             gen_audio = gen_audio.cpu()
             # torchaudio.save(args.save_path, gen_audio[0], self.sample_rate)
-            new_audios.put(((gen_audio + 1) * 127.5).detach().numpy().astype("uint8"))
+            # new_audios.put(((gen_audio + 1) * 127.5).detach().numpy().astype("uint8"))
+            stream.write((gen_audio * (2 ** 16 - 1)).detach().numpy().tobytes())
 
             # total.append(new_tokens)
             prompt_tokens = gen_tokens[..., -gen_tokens.shape[-1] // 2:]
