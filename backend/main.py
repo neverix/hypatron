@@ -1,11 +1,11 @@
 import modal
+import os
 
 image = (
     modal.Image.debian_slim()
     .run_commands(
-        "apt update && apt install -y git portaudio19-dev",
-        "git clone https://github.com/sd-fabric/fabric.git")
-    ).pip_install_from_requirements("requirements.txt")
+        "apt update && apt install -y git portaudio19-dev")
+    ).pip_install_from_requirements("requirements.txt").pip_install("pip install git+https://github.com/sd-fabric/fabric.git")
     
 
 stub = modal.Stub("eeg-art", image=image)
