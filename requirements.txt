@@ -9,3 +9,15 @@ Requests
 scikit_learn
 scipy
 torch
+accelerate
+diffusers
+torch
+transformers
+hydra-core
+matplotlib
+pandas
+tqdm
+Pillow
+ftfy
+regex
+clip @ git+https://github.com/openai/CLIP.git

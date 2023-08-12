@@ -1,17 +1,36 @@
 import modal
 import os
+import base64
+from io import BytesIO
+from PIL import Image
 
 image = (
     modal.Image.debian_slim()
     .run_commands(
-        "apt update && apt install -y git portaudio19-dev")
-    ).pip_install_from_requirements("requirements.txt").pip_install("pip install git+https://github.com/sd-fabric/fabric.git")
+        "apt update && apt install -y git portaudio19-dev").pip_install("git+https://github.com/sd-fabric/fabric.git")
+    ).pip_install_from_requirements("requirements.txt")
     
 
 stub = modal.Stub("eeg-art", image=image)
 
 generator = None
 images = []
+
+def pil_image_to_base64(img: Image.Image, format="PNG") -> str:
+    """
+    Convert a PIL Image to Base64-encoded string.
+
+    Parameters:
+    - img (PIL.Image.Image): The image object to convert.
+    - format (str): The image format for saving (default is PNG).
+
+    Returns:
+    - str: The Base64-encoded string.
+    """
+    buffered = BytesIO()
+    img.save(buffered, format=format)
+    return base64.b64encode(buffered.getvalue()).decode()
+
 
 if not modal.is_local():
     from fabric.generator import AttentionBasedGenerator
@@ -37,9 +56,10 @@ if not modal.is_local():
 
     generator = IterativeFeedbackGenerator(generator)
 
-@stub.function(keep_warm=1, concurrency_limit=1, gpu=modal.gpu.A100(memory=20))
+@stub.function(keep_warm=1, concurrency_limit=1, cpu=8, gpu=modal.gpu.A100(memory=20))
 @modal.web_endpoint(method="GET")
-def root(prompt: str = "photo of a dog running on grassland, masterpiece, best quality, fine details", negative_prompt: str = "lowres, bad anatomy, bad hands, cropped, worst quality",
+def root(prompt: str = "photo of a dog running on grassland, masterpiece, best quality, fine details",
+            negative_prompt: str = "lowres, bad anatomy, bad hands, cropped, worst quality",
                    denoising_steps = 20,
                    guidance_scale = 6.0,
                    feedback_start = 0.0,
@@ -59,7 +79,10 @@ def root(prompt: str = "photo of a dog running on grassland, masterpiece, best q
         feedback_end=feedback_end,
     )
 
-    return images
+    print("Generated images:")
+    # for each PIL.Image.Image inside images, convert to base 64 and return
+    images = [pil_image_to_base64(image) for image in images]
+    return {"images": images}
 
 
 
