@@ -1,4 +1,5 @@
 import numpy as np  # Module that simplifies computations on matrices
+from aiohttp import web
 import matplotlib.pyplot as plt  # Module used for plotting
 from pylsl import StreamInlet, resolve_byprop  # Module to receive EEG data
 import utils  # Our own utility functions
@@ -6,15 +7,16 @@ import time
 import subprocess
 from muselsl.cli import CLI
 
-import requests
-import websockets
+import asyncio
 from websockets.sync.client import connect
-import json
+import aiohttp
+import requests
+
+from io import BytesIO
+from PIL import Image
+from base64 import b64encode
 
 
-subprocess.Popen(["python3.11", "-m", "muselsl", "stream"])
-time.sleep(12)
-print("Continuing")
 
 
 # Handy little enum to make code more readable
@@ -47,9 +49,9 @@ SHIFT_LENGTH = EPOCH_LENGTH - OVERLAP_LENGTH
 # 0 = left ear, 1 = left forehead, 2 = right forehead, 3 = right ear
 INDEX_CHANNEL = [0]
 
-if __name__ == "__main__":
+async def main():
     """ 0. CONNECT TO SERVER """
-    sock = connect("ws://localhost:8765")
+    # sock = connect("ws://localhost:8765")
 
     """ 1. CONNECT TO EEG STREAM """
 
@@ -92,8 +94,29 @@ if __name__ == "__main__":
     avgs = []
     metrics = []
     imgs = []
-    avg_samples = 3
+    # avg_samples = 1000
+    avg_samples = 80  # for some reason it's really slow, is this data legit?
     batch = 4
+
+    session = aiohttp.ClientSession()
+    async def img(req):
+        print("req", req)
+        print(len(imgs), len(avgs))
+        try:
+            img = imgs[len(avgs)]
+        except IndexError:
+            im = Image.new("RGB", (512, 512), (0, 0, 0))
+            bio = BytesIO()
+            im.resize((128, 128)).save(bio, format="JPEG")
+            bio.seek(0)
+            img = b64encode(bio.read()).decode("utf-8")
+        return web.json_response({"image": img})  # json(val)
+    app = web.Application()
+    app.add_routes([web.get('/api', img)])
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", 3001)
+    await site.start()
 
     """ 3. GET DATA """
 
@@ -103,20 +126,25 @@ if __name__ == "__main__":
     try:
         # The following loop acquires data, computes band powers, and calculates neurofeedback metrics based on those band powers
         while True:
-            print("Images available", len(imgs), "Metrics available", len(metrics),
-                  "Avgs available", len(avgs))
+            # print("Images available", len(imgs), "Metrics available", len(metrics),
+                #   "Avgs available", len(avgs))
             if not imgs:
                 # roman your stuff goes here
+                image_index=None
                 if avgs:
                     # print(avgs)
                     # pass
                     # requests.post("...", json=avgs)
-                    sock.send(json.dumps({"averages": avgs}))
-                    print("sent")
+                    # sock.send(json.dumps({"averages": avgs}))
+                    image_index = np.argmax(np.asarray(avgs)[:, 0])
                     avgs = []
-                imgs = json.loads(sock.recv())
-                print("Received:", str(imgs)[:50])
-                batch = len(imgs["images"])
+                # imgs = json.loads(sock.recv())
+                postf = "" if image_index is None else f"&image_index={image_index}"
+                async with session.get("https://shreyj1729--eeg-art-root.modal.run/?prompt=cat&negative_prompt={postf}") as pics:
+                    imgs = (await pics.json())["images"]
+                print("sent")
+                print("Received:", len(imgs), str(imgs)[:50])
+                # batch = len(imgs["images"])
                 # imgs = requests.get("...")
             """ 3.1 ACQUIRE DATA """
             # Obtain EEG data from the LSL stream
@@ -175,17 +203,26 @@ if __name__ == "__main__":
 
             plt.clf()
             plt.plot(metrics)
-            plt.pause(0.05)
+            plt.pause(1e-10)
 
             metric = [alpha_metric, beta_metric, theta_metric]
             metrics.append(metric)
-            if len(metrics) % avg_samples == avg_samples - 1:
+            if len(metrics) >= avg_samples:  # % avg_samples == avg_samples - 1:
                 avgs.append(list(np.mean(metrics, axis=0)))
                 metrics = []
             if len(avgs) == batch:
                 imgs = []
 
             counter += 1
+            await asyncio.sleep(0)
 
     except KeyboardInterrupt:
         print('Closing!')
+
+
+if __name__ == "__main__":
+
+    subprocess.Popen(["python3.11", "-m", "muselsl", "stream"])
+    time.sleep(12)
+    print("Continuing")
+    asyncio.run(main())

@@ -17,7 +17,7 @@ def b64enc(im):
 def dummy(queue):
     async def fn(websocket):
         while True:
-            im = Image.new("RGB", (512, 512))
+            im = Image.new("RGB", (512, 512), (0, 0, 0))
             to_send = {"images": [b64enc(im)] * 4}
             await queue.put(to_send)
             await websocket.send(json.dumps(to_send))
@@ -26,28 +26,12 @@ def dummy(queue):
             print(avgs)
     return fn
 
-def make_route(queue):
-    async def img(req):
-        while queue.qsize() > 1:
-            await queue.get()
-        # ahahahahhahahahahhaaha
-        val = await queue.get()
-        await queue.put(val)
-        return json(val)
-    return img
 
 async def main():
     queue = asyncio.Queue()
     async with serve(dummy(queue), "localhost", 8765):
         for _ in range(10):
             await queue.put({"images": []})
-        app = web.Application()
-        app.add_routes([web.get('/', make_route(queue))])
-        runner = web.AppRunner(app)
-        await runner.setup()
-        site = web.TCPSite(runner, "localhost", 9000)
-        await site.start()
         await asyncio.Event().wait()
-        
 
 asyncio.run(main())
