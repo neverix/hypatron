@@ -84,10 +84,46 @@ def root(prompt: str = "photo of a dog running on grassland, masterpiece, best q
     print("Generated images:")
     # for each PIL.Image.Image inside images, convert to base 64 and return
     images = [pil_image_to_base64(image) for image in images]
+    images[0]
 
+    import requests
 
+    # Assuming there's a Replicate Python client, but if not, we'll use the requests library for HTTP calls
+
+    auth_token = "r8_0lb878HgTZ2cMcXyIOTPVxXoGAwxNRY1Ye9tp"
+    headers = {
+        "Authorization": f"Bearer {auth_token}",
+        "Content-Type": "application/json"
+    }
+
+    # Image URL
+    image_url = "https://www.lifewire.com/thmb/lWlCQDkZkvbWxKhkJZ6yjOJ_J4k=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/ScreenShot2020-04-20at10.03.23AM-d55387c4422940be9a4f353182bd778c.jpg"
+
+    # Running the model
+    run_endpoint = "https://replicate-endpoint.com/run"  # Replace with actual endpoint if it's different
+    run_payload = {
+        "model": "pharmapsychotic/clip-interrogator:a4a8bafd6089e1716b06057c42b19378250d008b80fe87caa5cd36d40c1eda90",
+        "input": {"image": image_url}
+    }
+
+    run_response = requests.post(run_endpoint, headers=headers, json=run_payload)
+    # Check response and handle any errors
+
+    # Making a prediction
+    predict_endpoint = "https://replicate-endpoint.com/predictions/create"  # Replace with actual endpoint if it's different
+    predict_payload = {
+        "version": "a4a8bafd6089e1716b06057c42b19378250d008b80fe87caa5cd36d40c1eda90",
+        "input": {"image": image_url},
+        "webhook": "https://shreyj1729--eeg-art-audio-webhook-dev.modal.run/",
+        "webhook_events_filter": ["completed"]
+    }
+
+    predict_response = requests.post(predict_endpoint, headers=headers, json=predict_payload)
+    # Check response and handle any errors
 
     return {"images": images}
+
+    
 
 
 
