@@ -9,6 +9,7 @@ import json
 def b64enc(im):
     bio = BytesIO()
     im.save(bio, format="PNG")
+    bio.seek(0)
     return b64encode(bio.read()).decode("utf-8")
 
 
