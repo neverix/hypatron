@@ -1,4 +1,5 @@
 import asyncio
+from aiohttp import web
 from websockets.server import serve
 from io import BytesIO
 from PIL import Image
@@ -25,16 +26,28 @@ def dummy(queue):
             print(avgs)
     return fn
 
-def retran(queue):
-    async def fn(websocket):
-        while True:
-            data = json.dumps(await queue.get())
-            await websocket.send("hello")
-    return fn
+def make_route(queue):
+    async def img(req):
+        while queue.qsize() > 1:
+            await queue.get()
+        # ahahahahhahahahahhaaha
+        val = await queue.get()
+        await queue.put(val)
+        return json(val)
+    return img
 
 async def main():
     queue = asyncio.Queue()
-    async with serve(dummy(queue), "localhost", 8765), serve(retran(queue), "localhost", 9000):
-        await asyncio.Future()  # run forever
+    async with serve(dummy(queue), "localhost", 8765):
+        for _ in range(10):
+            await queue.put({"images": []})
+        app = web.Application()
+        app.add_routes([web.get('/', make_route(queue))])
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "localhost", 9000)
+        await site.start()
+        await asyncio.Event().wait()
+        
 
 asyncio.run(main())
